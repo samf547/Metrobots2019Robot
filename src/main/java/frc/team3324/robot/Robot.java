@@ -1,41 +1,88 @@
 package frc.team3324.robot;
 
-import edu.wpi.first.wpilibj.command.Command;
-import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
-import frc.team3324.robot.DriveTrain.Commands.Auto.JaciPathfinding;
-import frc.team3324.robot.DriveTrain.DriveTrain;
-
+import badlog.lib.BadLog;
 import edu.wpi.first.cameraserver.CameraServer;
+import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.command.Scheduler;
-import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
+import frc.team3324.robot.arm.Arm;
+import frc.team3324.robot.climber.Climber;
+import frc.team3324.robot.intake.cargo.CargoIntake;
+import frc.team3324.robot.drivetrain.DriveTrain;
+import frc.team3324.robot.intake.HatchIntake;
 
+import edu.wpi.first.wpilibj.TimedRobot;
+import frc.team3324.robot.util.OI;
+
+/**
+ * Main robot class. Declares and instantiates subsystems and peripheral systems (OI, LEDs, etc.).
+ */
 public class Robot extends TimedRobot {
+
+    public Robot() { super(0.02); }
+    public static Compressor compressor = new Compressor(0);
     /*
      * Instantiate subsystems
      */
-    public static final DriveTrain mDriveTrain = new DriveTrain();
+    public static PowerDistributionPanel pdp = new PowerDistributionPanel();
+
+    public static Arm arm;
+    public static DriveTrain driveTrain;
+    public static CargoIntake cargoIntake;
+    public static HatchIntake hatchIntake;
+    public static Climber climber;
+    public static OI oi;
+
+    //public static LED led;
+
+    private static BadLog logger;
 
     public void robotInit() {
+        logger = BadLog.init("/home/lvuser/log.bag" + System.currentTimeMillis(), true);
+        {
+            arm = new Arm();
+            cargoIntake = new CargoIntake();
+            driveTrain = new DriveTrain();
+            hatchIntake = new HatchIntake();
+           // led = new LED();
+            oi = new OI();
+            climber = new Climber();
+
+            BadLog.createTopic("System/Battery Voltage", "V", () -> RobotController.getBatteryVoltage());
+            BadLog.createTopic("Match Time", "s", () -> DriverStation.getInstance().getMatchTime());
+        }
+        compressor.start();
+
+        driveTrain.clearGyro();
+        logger.finishInitialization();
         Shuffleboard.startRecording();
+        CameraServer.getInstance().startAutomaticCapture(0);
+        CameraServer.getInstance().startAutomaticCapture(1);
+        CameraServer.getInstance().putVideo("Camera output", 1280, 720);
     }
+
     public void robotPeriodic() {
+        Scheduler.getInstance().run();
+        Robot.driveTrain.printEncoderDistance();
+        logger.updateTopics();
+        logger.log();
+
         CameraServer.getInstance().getVideo();
     }
 
     public void disabledInit() {
-        CameraServer.getInstance().startAutomaticCapture();
-        CameraServer.getInstance().putVideo("Camera output", 1280, 720);
+    }
+
+    @Override
+    public void disabledPeriodic() {
     }
 
     @Override
     public void autonomousInit() {
-        Scheduler.getInstance().add(new JaciPathfinding(JaciPathfinding.path.TOP_HATCH));
+        //        Scheduler.getInstance().add(new levelOneTest());
     }
 
-    public void autonomousPeriodic() { Scheduler.getInstance().run(); }
-
+    @Override
     public void teleopPeriodic() {
-        Scheduler.getInstance().run();
-        mDriveTrain.printEncoderDistance();
     }
 }
